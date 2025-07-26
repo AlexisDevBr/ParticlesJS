@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en-US">
+    <head>
+        <meta charset="utf-8">
+        <title>Partículas Com Física</title>
+        <style>
+            * {
+                padding: 0;
+                margin: 0;
+                background-color: black;
+            }
+            text {
+                color: white;
+            }
+            canvas {
+                background: #1d1b1b;
+                outline-style: solid;
+                outline-width: 2px;
+                outline-color: aqua;
+                position: absolute;
+                inset: 0px;
+                margin: auto;
+             }
+            .container ul {
+                outline: solid;
+                outline-width: 1px;
+                outline-color: dimgray;
+                background-color:#1d1b1b;
+                margin-top: 10%;
+                max-width: fit-content;
+                margin-left: 10px;
+                padding: 1px;
+            }
+            .container li {
+                background-color: transparent;
+                display: flex;
+                align-items: center;
+                color: lightgrey;
+                list-style: none;
+                margin:5px;
+                font-size: 24px;
+                margin-right: auto;
+            }
+            button {
+                font-size: 18px;
+                width: 125px;
+                height: 30px;
+                background: white;
+                text-align: center;
+                position: relative;
+                border-radius: 5px;
+                margin-top: 5px;
+                margin-left: 10px;
+                margin-right: 0px;
+                border-color: transparent;
+            }
+            button:hover {
+                background-color: lightgray;
+            }
+            button:active {
+                transition: 0.02s linear;
+                background-color: gray;
+            }
+            label {
+                background-color: transparent;
+                width: 180px;
+            }
+            .container li#abc label {
+                width: 40px;
+                margin-left: 10px;
+            }
+            input {
+                flex-grow: 1;
+                background: rgb(218, 218, 218);
+                position: relative;
+                color: black;
+                max-width: 66px;
+                font-size: 24px;
+                text-align: right;
+                border-radius: 5px;
+                margin-left: 5px;
+                margin-right: 5px;
+            }
+            input:hover, input:focus{
+                outline: none;
+            }
+
+            input#YesGravity, input#NoGravity{
+                appearance: none;
+                border-radius: 100%;
+                width: 16px;
+                height: 16px;
+                border: 2px solid white;
+                transition: 0.2s all linear;
+            }
+            input#YesGravity:checked, input#NoGravity:checked{
+                border: solid;
+                background-color: rgb(0, 140, 255);
+                border-color: white;
+                border-radius: 16px;
+                border-width: 2px
+            }
+            p#FPSTEXTO {
+                color: white;
+                font-size: 24px;
+                margin-left: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <canvas id="canvas" width="600px" height="600px"></canvas>
+            <ul>
+                <li>
+                    <label for="NumberOfParticles">Quantidade:</label>
+                    <input type="number" min="0" value="10" id="NumberOfParticles" onchange="UpdateValue()"/>
+                </li>
+                <li>
+                    <label for="ParticleSize">Tamanho:</label>            
+                    <input type="number" id="ParticleSize" value="20" min="1" onchange="UpdateValue()"/>
+                </li>
+                <li>
+                    <label for="Velocity">Velocidade inicial:</label>
+                    <input type="number" id="Velocity" min="0" value="2" max="10" step="0.1" onchange="UpdateValue()"/>
+                </li>
+                <li>
+                    <label for="Friction">Fricção:</label>            
+                    <input type="number" id="Friction" min="0" value="0.05" max="1" step="0.01" onchange="UpdateValue()"/>
+                </li>
+                
+                <li id="abc">Gravidade:          
+                    <label for="YesGravity">Sim</label>
+                    <input type="radio" id="YesGravity" name="gravity" checked onchange="UpdateValue()"/>
+                    <label for="NoGravity">Não</label>
+                    <input type="radio" id="NoGravity" name="gravity"  onchange="UpdateValue()"/>
+                </li>
+            </ul>
+            
+            <button id="startButton">Start</button>
+            <button id="clearButton">Clear</button>
+            <p id="FPSTEXTO">FPS:<span id="fps_numero"></span></p>
+        </div>
+        
+        <script>
+
+            // canvas
+
+            const canvas = document.getElementById("canvas");
+            const ctx    = canvas.getContext('2d');
+
+            // canvas parameters
+
+            let NumberOfParticles  = document.getElementById("NumberOfParticles").value;
+            let ParticleSize       = document.getElementById("ParticleSize").value;
+            let ParticleVelocity   = document.getElementById("Velocity").value;
+            let CanvasFriction     = document.getElementById("Friction").value;
+            let ParticlesPerRow;
+
+            let gravity  = 0;
+            let Friction = 0;
+
+            // animation
+
+            let interval  = 0;
+            let requestID = undefined;
+            let times     = [];
+            let fps;
+            let fpstext   = document.getElementById("fps_numero");
+
+            // drawing
+
+            const startAngle = 0;
+            const endAngle = 360;
+            const anticlockwise = false;
+
+            let colours = [ // colours available to choose
+                "#FF69B4",
+                "#FF4500",
+                "#4682B4",
+                "#7CFC00",
+                "#FFFAFA",
+                "#0000CD",
+                "#808080"
+            ]
+
+            // ---------- Functions ---------- //
+
+            function getRndInteger(min, max) {
+                return Math.floor(Math.random() * (max - min) ) + min;
+            }
+
+            function getRndNumberN(min, max, N) { // random number with N decimal places after "."
+                return Math.round((Math.random() * (max - min) + min)*(10**N))/(10**N);
+            }
+
+            function randomColour() { // choose random colour from colour list
+                return colours[Math.floor(Math.random() * colours.length)];
+            }
+
+            function IsNumberTooBig(PPR) { // checks if the choosen particle number fits inside the canvas
+                PositionOfLastParticle = (ParticleSizeForPosition / 2) + ((ParticleSizeForPosition) * Math.floor((NumberOfParticles - 1) / PPR))
+                LastPossibleSpawnPoint = canvas.height-(ParticleSizeForPosition / 2)
+                if (PositionOfLastParticle > LastPossibleSpawnPoint) { // checks if a particle in the last row would spawn inside a wall
+                    return true;
+                }
+            }
+            
+            function UpdateValue() { // updates parameters
+                NumberOfParticles  = document.getElementById("NumberOfParticles").value;
+                ParticleSize       = document.getElementById("ParticleSize").value;
+                ParticleVelocity   = document.getElementById("Velocity").value;
+                CanvasFriction     = document.getElementById("Friction").value;
+            }
+           
+            function showFPS() {
+                fpstext.innerHTML = fps;
+            }
+            
+            function MaxParticlesPerRow(SizeOfParticle) { // max number of particles per row
+                NumberPerRow = Math.floor(canvas.width / SizeOfParticle);
+                return NumberPerRow;
+            }
+
+            // physics functions
+
+            function decideGravity() {
+                if (document.getElementById("YesGravity").checked) {
+                    gravity = 0.01;
+                }
+                else if (document.getElementById("NoGravity").checked) {
+                    gravity = 0;
+                }
+            }
+
+            function decideFriction() {
+                Friction = 1 - CanvasFriction; // the smaller the number, the more it loses energy
+            }
+
+            // create a particle
+
+            function Particle(x, y, dx, dy, diameter, color, friction) {
+                this.x = x;
+                this.y = y;
+                this.dx = dx;
+                this.dy = dy;
+                this.radius = diameter / 2;
+                this.color = color;
+                this.mass = (Math.PI * this.radius ** 2)
+
+                this.update = function() {
+                    this.particleCollision();
+                    this.boxCollision();
+                    this.updatePositon();
+                    this.drawParticle();
+                }
+
+                this.boxCollision = function() {
+                    if (this.x + this.radius >= canvas.width || this.x - this.radius <= 0) { // collision x axis
+                        let collision = 'x'
+                        this.dx = -this.dx * Friction; // adding friction loss
+                        this.PenetrationResBox(collision);
+                    }
+                    if (this.y + this.radius >= canvas.height || this.y - this.radius <= 0) { // collision y axis
+                        let collision = 'y'
+                        this.dy = -this.dy * Friction; // adding friction loss
+                        this.PenetrationResBox(collision);
+                    } else {
+                        this.dy += gravity; // acceleration of gravity when its not hitting top or bottom
+                    }
+                }
+
+                this.PenetrationResBox = function(collision) {
+                    if (collision == "x") {
+                        let distance_xBox1 = this.x;                 // distance to the left wall
+                        let distance_xBox2 = canvas.width - this.x;  // distance to the right wall
+
+                        if (distance_xBox1 <= this.radius) {
+                            let pen_depthBox = this.radius - distance_xBox1
+                            this.x += pen_depthBox;
+                        } else {
+                            let pen_depthBox = -(this.radius - distance_xBox2) // negative because it should go to the left
+                            this.x += pen_depthBox;
+                        }
+
+                    }
+                    if (collision == "y") {
+                        let distance_YBox1 = this.y;                 // distance to the top wall
+                        let distance_YBox2 = canvas.height - this.y; // distance to the bottom wall
+
+                        if (distance_YBox1 <= this.radius) {
+                        let pen_depthBox = this.radius - distance_YBox1
+                        this.y += pen_depthBox;
+                        } else {
+                            let pen_depthBox = -(this.radius - distance_YBox2) // negative because it should go up
+                            this.y += pen_depthBox;
+                        }
+                    }
+                }       
+                
+                this.PenetrationRes = function(i, j) {
+                    let distance_x   = Math.abs(particleArray[i].x - particleArray[j].x);
+                    let distance_Y   = Math.abs(particleArray[i].y - particleArray[j].y);
+                    let distance_mag = Math.sqrt(distance_Y**2 + distance_x**2);
+                    let pen_depth    = particleArray[i].radius + particleArray[j].radius - distance_mag;
+                    let pen_res_x    = pen_depth / 2;
+                    let pen_res_y    = pen_depth / 2;
+
+                    if (particleArray[i].x < particleArray[j].x) { // i to the left j
+                        particleArray[i].x -= pen_res_x;
+                        particleArray[j].x += pen_res_x;
+                    }
+                    if (particleArray[i].x > particleArray[j].x) { // i to the right of j
+                        particleArray[i].x += pen_res_x;
+                        particleArray[j].x -= pen_res_x;
+                    }
+                    if (particleArray[i].y < particleArray[j].y) { // i above j
+                        particleArray[i].y -= pen_res_y;
+                        particleArray[j].y += pen_res_y;
+                    }
+                    if (particleArray[i].y > particleArray[j].y) { // i below j
+                        particleArray[i].y += pen_res_y;
+                        particleArray[j].y -= pen_res_y;
+                    }
+                }
+                        
+                this.particleCollision = function(i, j) {
+                    //test for 'hits' with eachother
+                    for (let i = 0; i < particleArray.length - 1; i++) {
+                        for (let j = i + 1; j < particleArray.length; j++) {
+                            if(
+                            (particleArray[i].x - particleArray[j].x) ** 2 + (particleArray[i].y - particleArray[j].y) ** 2 // distance between the particles
+                            <= (particleArray[i].radius + particleArray[j].radius) ** 2 // sum of the radius
+                            ) {
+                                this.PenetrationRes(i, j);
+                                dxf1 = 
+                                ((particleArray[i].mass - particleArray[j].mass) / 
+                                (particleArray[i].mass + particleArray[j].mass)) * particleArray[i].dx + 
+                                (2 * particleArray[j].mass) / 
+                                (particleArray[i].mass + particleArray[j].mass) * particleArray[j].dx;
+
+                                dyf1 = 
+                                ((particleArray[i].mass - particleArray[j].mass) / 
+                                (particleArray[i].mass + particleArray[j].mass)) * particleArray[i].dy + 
+                                (2 * particleArray[j].mass) / 
+                                (particleArray[i].mass + particleArray[j].mass) * particleArray[j].dy;
+
+                                dxf2 =
+                                ((particleArray[j].mass - particleArray[i].mass) / 
+                                (particleArray[i].mass + particleArray[j].mass)) * particleArray[j].dx + 
+                                (2 * particleArray[i].mass) / 
+                                (particleArray[i].mass + particleArray[j].mass) * particleArray[i].dx;
+                            
+                                dyf2 = 
+                                ((particleArray[j].mass - particleArray[i].mass) / 
+                                (particleArray[i].mass + particleArray[j].mass)) * particleArray[j].dy + 
+                                (2 * particleArray[i].mass) / 
+                                (particleArray[i].mass + particleArray[j].mass) * particleArray[i].dy;
+                                
+
+                                particleArray[i].dx = dxf1;
+                                particleArray[i].dy = dyf1;
+                                particleArray[j].dx = dxf2;
+                                particleArray[j].dy = dyf2;
+                            }
+                        }
+                    }
+                }
+
+                this.updatePositon = function () {
+                    this.x += this.dx;
+                    this.y += this.dy;
+                }
+
+                this.drawParticle = function() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, (Math.PI / 180) * startAngle, Math.PI / 180 * endAngle, anticlockwise);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.closePath();
+                }
+            }
+
+            // creates and validates all the particles
+
+            function init() {
+                particleArray = [];
+                ParticleSizeForPosition = Number(ParticleSize) + 4;
+                ParticlesPerRow = MaxParticlesPerRow(ParticleSizeForPosition);
+                if (IsNumberTooBig(ParticlesPerRow)) {
+                    alert("This number of particles does not fit the canvas in this size.")
+                }
+                else { // run if all particles fit inside the canvas
+                    decideGravity();
+                    decideFriction();
+                    for (var i = 0; i < NumberOfParticles; i++){
+                        let pParticleRadius = ParticleSize;
+                        let px = (ParticleSizeForPosition / 2) + ((ParticleSizeForPosition) * (i % ParticlesPerRow));
+                        let py = (ParticleSizeForPosition / 2) + ((ParticleSizeForPosition) * Math.floor(i / ParticlesPerRow));
+                        let pdx = getRndNumberN(-ParticleVelocity,ParticleVelocity,2);
+                        let pdy = getRndNumberN(-ParticleVelocity,ParticleVelocity,2);
+                        let pColor = randomColour();
+                        particleArray.push(new Particle(px, py, pdx, pdy, pParticleRadius, pColor));
+                    }
+                }
+            }
+
+            // "Clear" button function
+
+            function stop() {
+                fps = null;
+                showFPS();
+                particleArray = [];
+                
+            }
+
+            // main loop
+
+            function mainLoop() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (var i = 0; i < particleArray.length; i++) {
+                    particleArray[i].update();
+                }
+                if (particleArray.length != 0) {
+                        requestID = window.requestAnimationFrame(function() {
+                        const now = performance.now();
+                        while (times.length > 0 && times[0] <= now - 1000) {
+                            times.shift();
+                        }
+                        times.push(now);
+                        fps = times.length;
+                        mainLoop()
+                    });
+                showFPS();
+                }
+            }
+
+            // buttons
+            
+            document.getElementById("startButton").addEventListener("click", function () {
+                if (requestID) {
+                    window.cancelAnimationFrame(requestID);
+                }
+                init();
+                mainLoop();
+            });
+
+            document.getElementById("clearButton").addEventListener("click", function () {
+                stop();
+            })
+        </script>
+    </body>
+</html>
