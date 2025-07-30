@@ -154,7 +154,6 @@
             let ParticleSize       = document.getElementById("ParticleSize").value;
             let ParticleVelocity   = document.getElementById("Velocity").value;
             let CanvasFriction     = document.getElementById("Friction").value;
-            let ParticlesPerRow;
 
             let gravity  = 0;
             let Friction = 0;
@@ -225,7 +224,7 @@
 
             function decideGravity() {
                 if (document.getElementById("YesGravity").checked) {
-                    gravity = 0.01;
+                    gravity = 0.04;
                 }
                 else if (document.getElementById("NoGravity").checked) {
                     gravity = 0;
@@ -247,10 +246,10 @@
                 this.color = color;
                 this.mass = (Math.PI * this.radius ** 2)
 
-                this.update = function() {
+                this.update = function(TimeElapsed) {
                     this.particleCollision();
                     this.boxCollision();
-                    this.updatePositon();
+                    this.updatePositon(TimeElapsed);
                     this.drawParticle();
                 }
 
@@ -366,9 +365,9 @@
                     }
                 }
 
-                this.updatePositon = function () {
-                    this.x += this.dx;
-                    this.y += this.dy;
+                this.updatePositon = function (ElapsedTime) {
+                    this.x += this.dx * ElapsedTime * 100;
+                    this.y += this.dy * ElapsedTime * 100;
                 }
 
                 this.drawParticle = function() {
@@ -386,7 +385,7 @@
             function init() {
                 particleArray = [];
                 ParticleSizeForPosition = Number(ParticleSize) + 4;
-                ParticlesPerRow = MaxParticlesPerRow(ParticleSizeForPosition);
+                let ParticlesPerRow = MaxParticlesPerRow(ParticleSizeForPosition);
                 if (IsNumberTooBig(ParticlesPerRow)) {
                     alert("This number of particles does not fit the canvas in this size.")
                 }
@@ -408,35 +407,45 @@
             // "Clear" button function
 
             function stop() {
+                then = 0;
                 fps = null;
                 showFPS();
                 particleArray = [];
-                
             }
 
             // main loop
 
+            let then = 0;
+
             function mainLoop() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                for (var i = 0; i < particleArray.length; i++) {
-                    particleArray[i].update();
-                }
-                if (particleArray.length != 0) {
-                        requestID = window.requestAnimationFrame(function() {
-                        const now = performance.now();
+                const now = performance.now();
+                if (particleArray != 0) {
+                    let TimeSeconds = now * 0.001;
+                    if (then == 0) {
+                        DeltaTime = 0;
+                    }
+                    else {
+                        DeltaTime = TimeSeconds - then;
+                    }
+                    then = TimeSeconds;
+                    for (var i = 0; i < particleArray.length; i++) {
+                        particleArray[i].update(DeltaTime);
+                        }
+                    requestID = window.requestAnimationFrame(function() {
                         while (times.length > 0 && times[0] <= now - 1000) {
                             times.shift();
                         }
                         times.push(now);
                         fps = times.length;
                         mainLoop()
-                    });
-                showFPS();
+                        });
+                    showFPS();
                 }
             }
 
             // buttons
-            
+
             document.getElementById("startButton").addEventListener("click", function () {
                 if (requestID) {
                     window.cancelAnimationFrame(requestID);
